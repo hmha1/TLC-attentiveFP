@@ -105,8 +105,6 @@ def smiles_to_graph(smiles):
         edge_attr=edge_attr
     )
 
-print("Atom features:", ATOM_DIM)
-print("Bond features:", BOND_DIM)
 # AttentiveFP
 from torch_geometric.nn import AttentiveFP
 
@@ -280,42 +278,44 @@ class HybridMPNN(nn.Module):
 def canonicalize_smiles(smiles):
     mol = Chem.MolFromSmiles(str(smiles).strip())
     if mol is None or mol.GetNumAtoms() == 0:
-        raise ValueError('SMILES không hợp lệ hoặc rỗng')
+        raise ValueError('SMILES is empty or invalid')
     return Chem.MolToSmiles(mol, canonical=True)
 
 def normalize_ratios(names, text, allowed):
     if not names or len(names) != len(set(names)):
-        raise ValueError('Chọn ít nhất một dung môi, không chọn trùng')
+        raise ValueError('Select at least one solvent without duplicates')
     if set(names) - set(allowed):
-        raise ValueError('Dung môi không có trong mô hình')
+        raise ValueError('The selected solvent is not supported by this model')
     parts = re.split(r'[:;\s]+', str(text).strip())
     try:
         values = np.array([float(x) for x in parts], dtype=np.float64)
     except ValueError:
-        raise ValueError('Nhập tỷ lệ dạng 6:1 hoặc 0.857:0.143')
+        raise ValueError('Enter ratios such as 6:1 or 0.857:0.143')
     if len(values) != len(names):
-        raise ValueError('Số tỷ lệ phải bằng số dung môi đã chọn')
+        raise ValueError('Provide one ratio for each selected solvent')
     if not np.isfinite(values).all() or (values < 0).any() or not np.isfinite(values.sum()) or values.sum() <= 0:
-        raise ValueError('Tỷ lệ phải hữu hạn, không âm và có tổng dương')
+        raise ValueError('Ratios must be finite, nonnegative, and have a positive total')
     return dict(zip(names, values / values.sum()))
 
 class Predictor:
     def __init__(self, checkpoint_path, expected=None):
-        self.path = Path(checkpoint_path)
-        if not self.path.is_file():
-            raise FileNotFoundError(f'Không tìm thấy checkpoint: {self.path}')
-        saved = torch.load(self.path, map_location='cpu', weights_only=True)
+        # Accept either a configured file path or an uploaded binary stream.
+        self.path = Path(checkpoint_path) if isinstance(checkpoint_path, (str, Path)) else None
+        if self.path is not None and not self.path.is_file():
+            raise FileNotFoundError(f'Checkpoint not found: {self.path}')
+        saved = torch.load(self.path if self.path is not None else checkpoint_path,
+                           map_location='cpu', weights_only=True)
         self.name = saved['model_name']
         if expected is not None and self.name != expected:
-            raise ValueError(f'Cần checkpoint {expected}, nhận được {self.name}')
+            raise ValueError(f'Expected a {expected} checkpoint, received {self.name}')
         classes = {'AttentiveFP': HybridAttentiveFP, 'MPNN': HybridMPNN}
         self.solvents = list(saved['solvent_cols'])
         self.inputs = list(saved['input_solvent_cols'])
         if self.inputs != self.solvents + ['missing_mobile_phase']:
-            raise ValueError('Schema checkpoint không được hỗ trợ')
+            raise ValueError('Unsupported checkpoint schema')
         config = saved['model_config']
         if (config['atom_dim'],config['bond_dim'],config['solvent_dim']) != (ATOM_DIM,BOND_DIM,len(self.inputs)):
-            raise ValueError('Kích thước đặc trưng không khớp checkpoint')
+            raise ValueError('Feature dimensions do not match the checkpoint')
         self.model = classes[self.name](**config).cpu().eval()
         self.model.load_state_dict(saved['model_state_dict'], strict=True)
 
@@ -327,3 +327,4 @@ class Predictor:
         graph.solvent = torch.tensor([[mixture.get(s,0.) for s in self.solvents]+[0.]], dtype=torch.float32)
         value = float(self.model(Batch.from_data_list([graph])).item())
         return {'SMILES': canonical, 'Rf': value, 'mixture': mixture}
+
