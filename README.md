@@ -1,34 +1,39 @@
-# TLC AttentiveFP
+# BluePhase · TLC AttentiveFP
 
-Predict TLC retention factors from a molecular SMILES string and a solvent mixture. All interface text, validation messages, and source comments are in English. Molecular features, solvent ordering, and model architecture are preserved from the inference notebook.
+A light-blue Streamlit app for predicting TLC retention factors from molecular SMILES and solvent mixtures. The trained checkpoint lives at `models/best_model.pt` and loads automatically. No model upload, Drive mount, or runtime download is required after the checkpoint is bundled.
+
+## Deploy to Streamlit Community Cloud
+
+Choose this repository, branch `main`, and entry point `app.py`. Use Python 3.12. The requirements file installs the tested CPU PyTorch build. The `.streamlit/config.toml` file supplies the light-blue theme.
+
+The **Bundle checkpoint** GitHub Actions workflow imports the released weights once, verifies their SHA-256, and commits the binary into the repository. Wait for this workflow to finish before the first deployment. Subsequent app starts load the committed file directly. The checkpoint is a regular Git blob, not a Git LFS pointer.
+
+## Use the app
+
+1. Enter the molecule's SMILES string.
+2. Tick the solvent checkboxes.
+3. Enter one relative ratio for each solvent. For n-Hexane : Ethyl acetate = 6:1, enter 6 and 1 beside their respective names.
+4. Click **Predict Rf**.
+
+Ratios are normalized automatically. Only the checkpoint's supported solvents are available. Changing an input clears the displayed prediction until a new prediction is requested.
+
+The animated isometric TLC plate illustrates solvent development. After prediction, its final spot position is set by `Rf = spot distance / solvent-front distance`. Animation speed, spot width, and the pre-prediction example are illustrative, not simulated chromatography or measured signals. Animation can be switched off and respects reduced-motion preferences.
 
 ## Run locally
-
-Use Python 3.11 or 3.12.
 
 ```bash
 pip install -r requirements.txt
 streamlit run app.py
 ```
 
-1. Download your saved [best_model.pt](https://drive.google.com/file/d/1J_6RorXv4rsEayyYkZQdZj7l-WT62PTm/view) from Google Drive.
-2. Upload it using **Model setup** in the sidebar, or place it at `models/best_model.pt` before starting the app.
-3. Enter a **SMILES** string.
-4. Tick the solvent checkboxes and enter a separate ratio for each selected solvent. For example, select n-Hexane and Ethyl acetate and enter 6 and 1 respectively. The app normalizes the mixture automatically.
-5. Click **Predict Rf**.
+All comments, interface text, and validation messages are in English. Model architecture, molecular features, and solvent ordering are preserved from the inference notebook. A custom local checkpoint can be selected using `TLC_CHECKPOINT` if needed.
 
-Only solvents recorded in the checkpoint are offered. The input order is paired explicitly with each ratio, and the model receives features in its original training order. Empty SMILES, unsupported solvents, and invalid ratios are rejected.
+## Model provenance
 
-## Streamlit Community Cloud
+Released run: `20261115T135528207396Z`, AttentiveFP, seed 42, random 80:20 split, five-fold cross-validation, maximum **100 epochs**, final refit **95 epochs**. Checkpoint size: 32,395,253 bytes.
 
-Select `app.py` as the entry point. Source code alone does not include the trained model: `*.pt` files are excluded from Git. Use the sidebar upload to load your checkpoint in the current session. Upload it again after a page refresh. This does not commit weights to GitHub.
+SHA-256: `b0ce3c93834d03578d094f7f7b7dc2429fb35892d6dd4d36478c8f27f909d5ba`.
 
-For persistent deployment, provision the checkpoint as a file on the server and set `TLC_CHECKPOINT` to its server path. A `/content/drive/...` path from Colab does not exist on Streamlit Community Cloud. An environment variable selects an existing file; it does not download the model. The file must be present on the deployment host.
+Original test metrics: MSE 0.0159974, RMSE 0.126481, MAE 0.0872023, R² 0.766549. These are recorded training-run metrics, not new deployment evaluation results. No confidence interval or applicability-domain estimate is provided. No training CSVs are included.
 
-## Saved model provenance
-
-The saved run `20261115T135528207396Z` uses AttentiveFP, random 80:20 splitting, five-fold cross-validation, seed 42, a maximum of **100 epochs**, and **95 final refit epochs**, as recorded in its run manifest. The final checkpoint is approximately 32.4 MB. This is not a claim that the final model was refit for exactly 100 epochs.
-
-Original random-split test metrics: MSE 0.0159974, RMSE 0.126481, MAE 0.0872023, R² 0.766549. These are recorded training-run metrics, not new deployment evaluation results. The app returns a single-model prediction without a confidence interval or applicability-domain estimate.
-
-Checkpoint loading uses `weights_only=True` on CPU and validates model name, schema, feature dimensions, and state-dictionary compatibility. Use your own trusted checkpoints. No training CSVs or weights are published in this repository.
+Checkpoint loading uses `weights_only=True` on CPU and validates model name, input schema, feature dimensions, and state-dictionary compatibility. The bundled model is checked against its release checksum.

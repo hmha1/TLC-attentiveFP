@@ -1,0 +1,32 @@
+name: Bundle checkpoint
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/bundle-checkpoint.yml
+permissions:
+  contents: write
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Download the released checkpoint
+        run: |
+          python -m pip install gdown==5.2.0
+          mkdir -p models
+          gdown 'https://drive.google.com/uc?id=1J_6RorXv4rsEayyYkZQdZj7l-WT62PTm' -O models/best_model.pt
+          echo 'b0ce3c93834d03578d094f7f7b7dc2429fb35892d6dd4d36478c8f27f909d5ba  models/best_model.pt' | sha256sum --check
+      - name: Commit the verified weights
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -f models/best_model.pt
+          if ! git diff --cached --quiet; then
+            git commit -m 'Bundle verified AttentiveFP checkpoint for Streamlit deployment'
+            git push
+          fi
