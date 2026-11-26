@@ -105,6 +105,8 @@ def smiles_to_graph(smiles):
         edge_attr=edge_attr
     )
 
+print("Atom features:", ATOM_DIM)
+print("Bond features:", BOND_DIM)
 # AttentiveFP
 from torch_geometric.nn import AttentiveFP
 
@@ -299,12 +301,10 @@ def normalize_ratios(names, text, allowed):
 
 class Predictor:
     def __init__(self, checkpoint_path, expected=None):
-        # Accept either a configured file path or an uploaded binary stream.
-        self.path = Path(checkpoint_path) if isinstance(checkpoint_path, (str, Path)) else None
-        if self.path is not None and not self.path.is_file():
+        self.path = Path(checkpoint_path)
+        if not self.path.is_file():
             raise FileNotFoundError(f'Checkpoint not found: {self.path}')
-        saved = torch.load(self.path if self.path is not None else checkpoint_path,
-                           map_location='cpu', weights_only=True)
+        saved = torch.load(self.path, map_location='cpu', weights_only=True)
         self.name = saved['model_name']
         if expected is not None and self.name != expected:
             raise ValueError(f'Expected a {expected} checkpoint, received {self.name}')
@@ -328,3 +328,18 @@ class Predictor:
         value = float(self.model(Batch.from_data_list([graph])).item())
         return {'SMILES': canonical, 'Rf': value, 'mixture': mixture}
 
+class Ensemble:
+    def __init__(self, attentive_path, mpnn_path):
+        self.attentive = Predictor(attentive_path, expected='AttentiveFP')
+        self.mpnn = Predictor(mpnn_path, expected='MPNN')
+        self.solvents = [s for s in self.attentive.solvents if s in self.mpnn.solvents]
+
+    def predict(self, smiles, names, ratios):
+        result = self.attentive.predict(smiles, names, ratios)
+        other = self.mpnn.predict(smiles, names, ratios)
+        result['AttentiveFP'] = result['Rf']
+        result['MPNN'] = other['Rf']
+        result['Rf'] = WEIGHT * result['AttentiveFP'] + (1-WEIGHT) * result['MPNN']
+        return result
+
+WEIGHT = 0.5774426289184875
