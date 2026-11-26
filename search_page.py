@@ -16,20 +16,22 @@ def render_search(ensemble):
     if st.button("Find top 10 systems", type="primary"):
         with running("Scoring candidate mixtures…"):
             try:
-                table, evaluated = search(ensemble, *query)
+                table, all_mixtures = search(ensemble, *query)
             except ValueError as exc:
                 st.error(str(exc))
                 return
-        st.session_state.search_result = (query, table, evaluated)
-    result = st.session_state.get("search_result")
+        st.session_state.search_export_result = (query, table, all_mixtures)
+    result = st.session_state.get("search_export_result")
     if result and result[0] == query:
-        _, table, evaluated = result
+        _, table, all_mixtures = result
         st.subheader("Predicted solvent systems")
-        st.caption(f"{evaluated:,} unique mixtures evaluated. Each solvent combination appears once, with its closest sampled ratio.")
+        st.caption(f"{len(all_mixtures):,} unique mixtures evaluated. Each solvent combination appears once, with its closest sampled ratio.")
         if tolerance:
             hits = int(table["Within range"].sum())
             st.write(f"{hits} of {len(table)} shown fall within Rf {max(0,target-tolerance):.3f}–{min(1,target+tolerance):.3f}.")
         table = table.copy()
         table.insert(0, "Rank", range(1,len(table)+1))
         st.dataframe(table, hide_index=True, column_config={c:st.column_config.NumberColumn(format="%.5f") for c in ["Predicted Rf","|ΔRf|"]})
-        st.download_button("Download CSV",table.to_csv(index=False), "tlc_solvent_search.csv","text/csv")
+        st.download_button("Download top 10 (CSV)",table.to_csv(index=False), "tlc_solvent_search.csv","text/csv")
+        st.download_button(f"Download all {len(all_mixtures):,} evaluated mixtures (CSV)",
+                           all_mixtures.to_csv(index=False), "tlc_all_evaluated_mixtures.csv", "text/csv")

@@ -94,7 +94,12 @@ def search(ensemble, smiles, target, tolerance=0., count=2, trials=10000, seed=4
                 best[ids] = key
 
     rows = []
-    for key in sorted(best.values(), key=lambda k:(abs(cache[k]-target),k))[:10]:
+    ranked = sorted(cache, key=lambda k:(abs(cache[k]-target),k))
+    best_keys = set(best.values())
+    top_indices = []
+    for i, key in enumerate(ranked):
+        if key in best_keys and len(top_indices) < 10:
+            top_indices.append(i)
         ids, percentages = key
         err = abs(cache[key]-target)
         rows.append({"Solvent system":" + ".join(solvents[i] for i in ids),
@@ -102,4 +107,5 @@ def search(ensemble, smiles, target, tolerance=0., count=2, trials=10000, seed=4
                      "|ΔRf|":err})
         if tolerance:
             rows[-1]["Within range"] = err <= tolerance
-    return pd.DataFrame(rows), len(cache)
+    all_mixtures = pd.DataFrame(rows)
+    return all_mixtures.iloc[top_indices].copy(), all_mixtures
