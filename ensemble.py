@@ -1,3 +1,4 @@
+from graph_encoding import encode_attentive, encode_mpnn
 from pathlib import Path
 import re
 import numpy as np
@@ -157,13 +158,7 @@ class HybridAttentiveFP(nn.Module):
         )
 
     def encode_graph(self, data):
-        # Graph-level molecular representation
-        return self.graph_encoder(
-            data.x,
-            data.edge_index,
-            data.edge_attr,
-            data.batch
-        )
+        return encode_attentive(self, data)
 
     def forward(self, data):
         graph_embedding = self.encode_graph(data)
@@ -248,21 +243,7 @@ class HybridMPNN(nn.Module):
         )
 
     def encode_graph(self, data):
-        x = F.relu(self.atom_encoder(data.x))
-
-        h = x.unsqueeze(0)
-
-        for _ in range(self.num_steps):
-            m = F.relu(
-                self.conv(x, data.edge_index, data.edge_attr)
-            )
-
-            x, h = self.gru(m.unsqueeze(0), h)
-            x = x.squeeze(0)
-
-        return self.pool(
-            x, data.batch
-        )
+        return encode_mpnn(self, data)
 
     def forward(self, data):
         graph_embedding = self.encode_graph(data)

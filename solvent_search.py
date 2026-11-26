@@ -5,6 +5,7 @@ import random
 
 import pandas as pd
 import torch
+from graph_encoding import encode_attentive, encode_mpnn
 from ensemble import Batch, WEIGHT, canonicalize_smiles, smiles_to_graph
 
 
@@ -25,7 +26,7 @@ def search(ensemble, smiles, target, tolerance=0., count=2, trials=10000, seed=4
         raise ValueError("Choose one to four solvents.")
     graph = Batch.from_data_list([smiles_to_graph(canonicalize_smiles(smiles))])
     models = (ensemble.attentive, ensemble.mpnn)
-    embeddings = [p.model.encode_graph(graph) for p in models]
+    embeddings = [encode_attentive(models[0].model, graph), encode_mpnn(models[1].model, graph)]
     columns = [[p.solvents.index(s) for s in solvents] for p in models]
 
     def score(keys):
