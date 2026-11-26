@@ -34,6 +34,11 @@ def load_models():
         return Ensemble(attentive, mpnn)
 
 predictor = load_models()
+if st.sidebar.radio("TLC Studio", ["Predict Rf", "Find solvent systems"]) == "Find solvent systems":
+    from search_page import render_search
+    render_search(predictor)
+    st.stop()
+
 st.title("TLC Studio")
 st.markdown('<p class="intro">Predict the retention factor of a molecule in your chosen solvent mixture.</p>', unsafe_allow_html=True)
 for smiles, names, fractions, result in st.session_state.get("history", []):

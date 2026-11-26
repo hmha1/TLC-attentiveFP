@@ -1,0 +1,34 @@
+import streamlit as st
+from solvent_search import search
+
+
+def render_search(ensemble):
+    st.title("Find solvent systems")
+    st.markdown('<p class="intro">Search for a mobile phase that brings your molecule close to a target Rf.</p>', unsafe_allow_html=True)
+    smiles = st.text_area("Molecular SMILES", height=100, placeholder="e.g. CCO")
+    left, right = st.columns(2)
+    target = left.number_input("Target Rf", 0., 1., .50, .01, format="%.3f")
+    tolerance = right.number_input("Tolerance (±)", 0., 1., 0., .01, format="%.3f")
+    count = st.selectbox("Solvents per system", [1,2,3,4], index=1)
+    st.caption("Ratios are searched in steps of 1%. Set tolerance to zero to search for a single target.")
+    query = (smiles.strip(), target, tolerance, count)
+    if st.button("Find top 10 systems", type="primary"):
+        with st.spinner("Scoring candidate mixtures…"):
+            try:
+                table, evaluated = search(ensemble, *query)
+            except ValueError as exc:
+                st.error(str(exc))
+                return
+        st.session_state.search_result = (query, table, evaluated)
+    result = st.session_state.get("search_result")
+    if result and result[0] == query:
+        _, table, evaluated = result
+        st.subheader("Closest predicted systems")
+        st.caption(f"{evaluated:,} unique mixtures evaluated. Each solvent combination appears once, with its closest sampled ratio.")
+        if tolerance:
+            hits = int(table["Within range"].sum())
+            st.write(f"{hits} of {len(table)} shown fall within Rf {max(0,target-tolerance):.3f}–{min(1,target+tolerance):.3f}.")
+        table = table.copy()
+        table.insert(0, "Rank", range(1,len(table)+1))
+        st.dataframe(table, hide_index=True, column_config={c:st.column_config.NumberColumn(format="%.5f") for c in ["Predicted Rf","|ΔRf|"]})
+        st.download_button("Download CSV",table.to_csv(index=False), "tlc_solvent_search.csv","text/csv")

@@ -156,16 +156,17 @@ class HybridAttentiveFP(nn.Module):
             nn.Sigmoid()
         )
 
-    def forward(self, data):
-
+    def encode_graph(self, data):
         # Graph-level molecular representation
-        graph_embedding = self.graph_encoder(
+        return self.graph_encoder(
             data.x,
             data.edge_index,
             data.edge_attr,
             data.batch
         )
 
+    def forward(self, data):
+        graph_embedding = self.encode_graph(data)
         # Solvent representation
         solvent_embedding = self.solvent_encoder(
             data.solvent
@@ -246,7 +247,7 @@ class HybridMPNN(nn.Module):
             nn.Sigmoid()
         )
 
-    def forward(self, data):
+    def encode_graph(self, data):
         x = F.relu(self.atom_encoder(data.x))
 
         h = x.unsqueeze(0)
@@ -259,10 +260,12 @@ class HybridMPNN(nn.Module):
             x, h = self.gru(m.unsqueeze(0), h)
             x = x.squeeze(0)
 
-        graph_embedding = self.pool(
+        return self.pool(
             x, data.batch
         )
 
+    def forward(self, data):
+        graph_embedding = self.encode_graph(data)
         solvent_embedding = self.solvent_encoder(
             data.solvent
         )
