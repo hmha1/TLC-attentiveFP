@@ -7,6 +7,7 @@ import pandas as pd
 import torch
 from graph_encoding import encode_attentive, encode_mpnn
 from ensemble import Batch, WEIGHT, canonicalize_smiles, smiles_to_graph
+from solvent_rules import natural_solvent_pool, natural_choices, solvent_label, display_solvent
 
 
 @dataclass
@@ -18,12 +19,15 @@ class Node:
 
 
 @torch.inference_mode()
-def search(ensemble, smiles, target, tolerance=0., count=2, trials=10000, seed=42):
+def search(ensemble, smiles, target, tolerance=0., count=2, trials=10000, seed=42, natural_products=False):
     if not (0 <= target <= 1 and 0 <= tolerance <= 1):
         raise ValueError("Target and tolerance must be between zero and one.")
-    solvents = ensemble.solvents
+    solvents = natural_solvent_pool(ensemble.solvents) if natural_products else ensemble.solvents
     if not 1 <= count <= min(4, len(solvents)):
         raise ValueError("Choose one to four solvents.")
+    allowed_choices = natural_choices(solvents, count) if natural_products else None
+    if natural_products and not allowed_choices:
+        raise ValueError("No compatible solvent systems are available for this component count.")
     graph = Batch.from_data_list([smiles_to_graph(canonicalize_smiles(smiles))])
     models = (ensemble.attentive, ensemble.mpnn)
     embeddings = [encode_attentive(models[0].model, graph), encode_mpnn(models[1].model, graph)]
@@ -43,6 +47,8 @@ def search(ensemble, smiles, target, tolerance=0., count=2, trials=10000, seed=4
     def options(prefix):
         depth = len(prefix)
         if depth < count:
+            if natural_products:
+                return allowed_choices[prefix]
             first = prefix[-1]+1 if depth else 0
             return range(first, len(solvents)-(count-depth)+1)
         # Reserve at least one percent for each remaining component.
@@ -102,10 +108,11 @@ def search(ensemble, smiles, target, tolerance=0., count=2, trials=10000, seed=4
             top_indices.append(i)
         ids, percentages = key
         err = abs(cache[key]-target)
-        rows.append({"Solvent system":" + ".join(solvents[i] for i in ids),
+        rows.append({"Solvent system":" + ".join((solvent_label if natural_products else display_solvent)(solvents[i]) for i in ids),
                      "Ratio (%)":":".join(map(str,percentages)), "Predicted Rf":cache[key],
                      "|ΔRf|":err})
         if tolerance:
             rows[-1]["Within range"] = err <= tolerance
     all_mixtures = pd.DataFrame(rows)
     return all_mixtures.iloc[top_indices].copy(), all_mixtures
+

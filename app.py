@@ -4,6 +4,7 @@ from tempfile import TemporaryDirectory
 import streamlit as st
 from ensemble import Ensemble
 from run_status import running
+from solvent_rules import display_solvent
 
 st.set_page_config(page_title="TLC Studio", page_icon="⚗", layout="centered")
 st.markdown("""
@@ -43,9 +44,10 @@ def load_models():
         return Ensemble(attentive, mpnn)
 
 predictor = load_models()
-if st.sidebar.radio("TLC Studio", ["Predict Rf", "Find solvent systems"]) == "Find solvent systems":
+page = st.sidebar.radio("TLC Studio", ["Predict Rf", "Find solvent systems", "Natural products"])
+if page in ("Find solvent systems", "Natural products"):
     from search_page import render_search
-    render_search(predictor)
+    render_search(predictor, natural_products=page == "Natural products")
     st.stop()
 
 st.title("TLC Studio")
@@ -53,7 +55,7 @@ st.markdown('<p class="intro">Predict the retention factor of a molecule in your
 for smiles, names, fractions, result in st.session_state.get("history", []):
     with st.chat_message("user"):
         st.code(smiles, language=None)
-        st.text(" · ".join(f"{s} {v:.1%}" for s,v in zip(names, fractions)))
+        st.text(" · ".join(f"{display_solvent(s)} {v:.1%}" for s,v in zip(names, fractions)))
     with st.chat_message("assistant"):
         st.metric("Predicted Rf", f"{result['Rf']:.4f}")
         st.caption(f"AttentiveFP {result['AttentiveFP']:.4f}   ·   MPNN {result['MPNN']:.4f}")
@@ -65,7 +67,7 @@ names, parts = [], []
 with st.container(height=340, border=True):
     for solvent in predictor.solvents:
         choice, ratio = st.columns([3,2])
-        selected = choice.checkbox(solvent)
+        selected = choice.checkbox(display_solvent(solvent), key=f"predict_solvent_{solvent}")
         value = ratio.number_input(f"Parts of {solvent}", min_value=0., value=1., step=0.1,
                                    disabled=not selected, label_visibility="collapsed")
         if selected:
@@ -81,3 +83,4 @@ if st.button("Predict Rf", type="primary", use_container_width=True):
         st.session_state.setdefault("history", []).append(
             (result["SMILES"], names, list(result["mixture"].values()), result))
         st.rerun()
+

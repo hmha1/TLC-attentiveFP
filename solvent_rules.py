@@ -1,0 +1,50 @@
+"""Natural-product search names and solvent compatibility rules."""
+from itertools import combinations
+
+NATURAL_SOLVENTS = (
+    "n-Butanol", "Acetic acid", "Acetone", "Chloroform", "Diethyl ether",
+    "Ethyl acetate", "Formic acid", "n-Hexane", "NH3", "Toluene",
+    "Triethylamine", "Water",
+)
+_ALIASES = {name.casefold(): name for name in NATURAL_SOLVENTS}
+_ALIASES.update({
+    "1-butanol": "n-Butanol", "butan-1-ol": "n-Butanol",
+    "glacial acetic acid": "Acetic acid", "acetic acid glacial": "Acetic acid",
+    "ammonia solution": "NH3", "ammonia": "NH3",
+})
+
+
+def solvent_label(name):
+    return _ALIASES.get(name.strip().casefold(), name)
+
+
+def display_solvent(name):
+    return "n-Butanol" if solvent_label(name) == "n-Butanol" else name
+
+
+def natural_solvent_pool(available):
+    # Keep the checkpoint's column names; aliases are for selection/display only.
+    by_label = {}
+    for name in available:
+        label = solvent_label(name)
+        if label in NATURAL_SOLVENTS:
+            if label not in by_label or name.casefold() == label.casefold():
+                by_label[label] = name
+    return [by_label[label] for label in NATURAL_SOLVENTS if label in by_label]
+
+
+def compatible(names):
+    labels = {solvent_label(name) for name in names}
+    acids = labels & {"Acetic acid", "Formic acid"}
+    bases = labels & {"NH3", "Triethylamine"}
+    return len(acids) <= 1 and len(bases) <= 1 and not (acids and bases)
+
+
+def natural_choices(solvents, count):
+    """Only allow prefixes that can reach a complete compatible system."""
+    choices = {}
+    for ids in combinations(range(len(solvents)), count):
+        if compatible(solvents[i] for i in ids):
+            for depth, action in enumerate(ids):
+                choices.setdefault(ids[:depth], set()).add(action)
+    return {prefix: sorted(actions) for prefix, actions in choices.items()}
