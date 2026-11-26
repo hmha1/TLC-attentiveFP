@@ -6,7 +6,7 @@ Streamlit prediction of thin-layer chromatography Rf from molecular SMILES and s
 
 Use the main branch, entry point `app.py`, and Python 3.12 on Streamlit Community Cloud. Locally, install requirements with `pip install -r requirements.txt` and run `streamlit run app.py`.
 
-Supply the original checkpoints in the app at session startup, or provision them as `models/AttentiveFP.pt` and `models/MPNN.pt` on the deployment host.
+Both trained checkpoints are bundled. The app assembles the five AttentiveFP parts at startup, verifies both SHA-256 checksums and caches the loaded models.
 
 ## Evaluation
 
