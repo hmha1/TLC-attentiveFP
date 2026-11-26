@@ -3,6 +3,7 @@ import hashlib
 from tempfile import TemporaryDirectory
 import streamlit as st
 from ensemble import Ensemble
+from run_status import running
 
 st.set_page_config(page_title="TLC Studio", page_icon="⚗", layout="centered")
 st.markdown("""
@@ -12,6 +13,14 @@ st.markdown("""
 h1 {font-family:Arial,sans-serif;font-weight:800;letter-spacing:-.06em}
 .intro {font:italic 1.17rem/1.5 Georgia,serif;color:#171717}
 textarea, [data-testid="stCheckbox"] label p, [data-testid="stNumberInput"] input {font-size:1.08rem!important}
+[data-testid="stSidebar"] [data-testid="stRadio"] > label p {font-size:1.45rem;font-weight:700}
+[data-testid="stSidebar"] [role="radiogroup"] label {min-height:52px;padding:.35rem .6rem;align-items:center;width:100%;border-radius:.6rem}
+[data-testid="stSidebar"] [role="radiogroup"] label p {font-size:1.28rem;font-weight:550;line-height:1.3}
+[data-testid="stSidebar"] [role="radiogroup"] label:has(input:checked) {background:#dce7dd}
+.run-status {display:flex;gap:.65rem;align-items:center;font-weight:600}
+.run-status span {font-size:1.7rem;display:inline-block;transform-origin:center bottom;animation:tlc-flame .65s ease-in-out infinite alternate}
+@keyframes tlc-flame {from {transform:rotate(-8deg) scale(.91)} to {transform:rotate(6deg) scale(1.09)}}
+@media (prefers-reduced-motion:reduce) {.run-status span {animation:none}}
 </style>
 """, unsafe_allow_html=True)
 
@@ -40,7 +49,7 @@ if st.sidebar.radio("TLC Studio", ["Predict Rf", "Find solvent systems"]) == "Fi
     st.stop()
 
 st.title("TLC Studio")
-st.markdown('<p class="intro">Predict the retention factor of a molecule in your chosen solvent mixture.</p>', unsafe_allow_html=True)
+st.markdown('<p class="intro">Predict the retention factor of a molecule in your solvent systems.</p>', unsafe_allow_html=True)
 for smiles, names, fractions, result in st.session_state.get("history", []):
     with st.chat_message("user"):
         st.code(smiles, language=None)
@@ -64,7 +73,8 @@ with st.container(height=340, border=True):
             parts.append(value)
 if st.button("Predict Rf", type="primary", use_container_width=True):
     try:
-        result = predictor.predict(smiles, names, ":".join(map(str,parts)))
+        with running("Predicting Rf…"):
+            result = predictor.predict(smiles, names, ":".join(map(str,parts)))
     except ValueError as exc:
         st.error(str(exc))
     else:

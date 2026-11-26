@@ -1,5 +1,6 @@
 import streamlit as st
 from solvent_search import search
+from run_status import running
 
 
 def render_search(ensemble):
@@ -13,7 +14,7 @@ def render_search(ensemble):
     st.caption("Ratios are searched in steps of 1%. Set tolerance to zero to search for a single target.")
     query = (smiles.strip(), target, tolerance, count)
     if st.button("Find top 10 systems", type="primary"):
-        with st.spinner("Scoring candidate mixtures…"):
+        with running("Scoring candidate mixtures…"):
             try:
                 table, evaluated = search(ensemble, *query)
             except ValueError as exc:
@@ -23,7 +24,7 @@ def render_search(ensemble):
     result = st.session_state.get("search_result")
     if result and result[0] == query:
         _, table, evaluated = result
-        st.subheader("Closest predicted systems")
+        st.subheader("Predicted solvent systems")
         st.caption(f"{evaluated:,} unique mixtures evaluated. Each solvent combination appears once, with its closest sampled ratio.")
         if tolerance:
             hits = int(table["Within range"].sum())
