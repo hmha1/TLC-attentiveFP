@@ -11,7 +11,6 @@ def render_search(ensemble, natural_products=False):
         st.subheader("Common solvents for natural products")
         available = natural_solvent_pool(ensemble.solvents)
         st.write(" · ".join(solvent_label(name) for name in available))
-        st.info("Use only one acid (acetic acid or formic acid) or one base (NH3 or triethylamine) per system. Acids and bases cannot be combined.")
         missing = set(NATURAL_SOLVENTS) - {solvent_label(name) for name in available}
         if missing:
             st.warning("Not supported by the loaded models: " + ", ".join(sorted(missing)))
